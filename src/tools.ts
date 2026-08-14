@@ -74,18 +74,14 @@ import {
     sourcesDocsUpload,
     sourcesDocsUploadForAppV2,
     sourcesDocsUploadV2,
-    sourcesSiteCrawl,
     sourcesSiteCrawlForAppV2,
     sourcesSiteCrawlV2,
     sourcesSiteDeleteBatchForAppV2,
-    sourcesSiteDeleteUrl,
     sourcesSiteDeleteUrlForAppV2,
-    sourcesSiteDeleteUrlV2,
     sourcesSiteDeleteUrlV2Batch,
     sourcesSiteDeleteUrlV2Single,
     sourcesSiteListForAppV2,
     sourcesSiteListV2,
-    sourcesSiteReindex,
     sourcesSiteReindexForAppV2,
     sourcesSiteReindexV2,
     sourcesSiteTagsUpdateForAppV2,
@@ -1365,99 +1361,6 @@ function filesDeleteV2Tool(server: McpServer) {
                 return asToolResult(ok(res.data, getDefaultMeta("ethora-files-delete-v2")))
             } catch (error) {
                 return asToolResult(fail(error, getDefaultMeta("ethora-files-delete-v2")))
-            }
-        }
-    )
-}
-
-function sourcesSiteCrawlTool(server: McpServer) {
-    server.registerTool(
-        "ethora-sources-site-crawl",
-        {
-            description: "Crawl a site URL and ingest into Sources (requires user auth).",
-            inputSchema: {
-                appId: z.string().optional().describe("Defaults to current app if selected"),
-                url: z.string().min(1),
-                followLink: z.boolean().default(false),
-            },
-        },
-        async function ({ appId, url, followLink }) {
-            try {
-                ensureUserAuthForTool()
-                const effectiveAppId = appId || requireCurrentAppId()
-                const res = await sourcesSiteCrawl(effectiveAppId, url, Boolean(followLink))
-                return asToolResult(ok(res.data, getDefaultMeta("ethora-sources-site-crawl")))
-            } catch (error) {
-                return asToolResult(fail(error, getDefaultMeta("ethora-sources-site-crawl")))
-            }
-        }
-    )
-}
-
-function sourcesSiteReindexTool(server: McpServer) {
-    server.registerTool(
-        "ethora-sources-site-reindex",
-        {
-            description: "Reindex a crawled URL by urlId (requires user auth).",
-            inputSchema: {
-                appId: z.string().optional().describe("Defaults to current app if selected"),
-                urlId: z.string().min(1),
-            },
-        },
-        async function ({ appId, urlId }) {
-            try {
-                ensureUserAuthForTool()
-                const effectiveAppId = appId || requireCurrentAppId()
-                const res = await sourcesSiteReindex(effectiveAppId, urlId)
-                return asToolResult(ok(res.data, getDefaultMeta("ethora-sources-site-reindex")))
-            } catch (error) {
-                return asToolResult(fail(error, getDefaultMeta("ethora-sources-site-reindex")))
-            }
-        }
-    )
-}
-
-function sourcesSiteDeleteUrlTool(server: McpServer) {
-    server.registerTool(
-        "ethora-sources-site-delete-url",
-        {
-            description: "Delete a crawled site URL by exact url string (requires user auth).",
-            inputSchema: {
-                appId: z.string().optional().describe("Defaults to current app if selected"),
-                url: z.string().min(1),
-            },
-        },
-        async function ({ appId, url }) {
-            try {
-                ensureUserAuthForTool()
-                const effectiveAppId = appId || requireCurrentAppId()
-                const res = await sourcesSiteDeleteUrl(effectiveAppId, url)
-                return asToolResult(ok(res.data, getDefaultMeta("ethora-sources-site-delete-url")))
-            } catch (error) {
-                return asToolResult(fail(error, getDefaultMeta("ethora-sources-site-delete-url")))
-            }
-        }
-    )
-}
-
-function sourcesSiteDeleteUrlV2Tool(server: McpServer) {
-    server.registerTool(
-        "ethora-sources-site-delete-records-v1",
-        {
-            description: "Legacy owner/admin flow: delete multiple crawled source records through the pre-v2 user-auth route.",
-            inputSchema: {
-                appId: z.string().optional().describe("Defaults to current app if selected"),
-                urls: z.array(z.string().min(1)).min(1).max(100),
-            },
-        },
-        async function ({ appId, urls }) {
-            try {
-                ensureUserAuthForTool()
-                const effectiveAppId = appId || requireCurrentAppId()
-                const res = await sourcesSiteDeleteUrlV2(effectiveAppId, urls)
-                return asToolResult(ok(res.data, getDefaultMeta("ethora-sources-site-delete-records-v1")))
-            } catch (error) {
-                return asToolResult(fail(error, getDefaultMeta("ethora-sources-site-delete-records-v1")))
             }
         }
     )
@@ -3822,10 +3725,6 @@ export function registerTools(server: McpServer) {
     filesUploadV2Tool(server);
     filesGetV2Tool(server);
     filesDeleteV2Tool(server);
-    sourcesSiteCrawlTool(server);
-    sourcesSiteReindexTool(server);
-    sourcesSiteDeleteUrlTool(server);
-    sourcesSiteDeleteUrlV2Tool(server);
     sourcesDocsUploadTool(server);
     sourcesDocsDeleteTool(server);
     sourcesSiteCrawlV2AppTool(server);
