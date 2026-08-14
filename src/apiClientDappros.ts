@@ -610,23 +610,11 @@ export function botHistoryGetV2(params?: {
 export const chatsMessageCreateV2 = botMessageCreateV2
 export const chatsHistoryGetV2 = botHistoryGetV2
 
-// sources (v1-style routes, user auth)
-export function sourcesSiteCrawl(appId: string, url: string, followLink: boolean) {
-  return httpClientDappros.post(`/sources/site-crawl/${appId}`, { url, followLink })
-}
-
-export function sourcesSiteReindex(appId: string, urlId: string) {
-  return httpClientDappros.post(`/sources/site-crawl-reindex/${appId}`, { urlId })
-}
-
-export function sourcesSiteDeleteUrl(appId: string, url: string) {
-  return httpClientDappros.delete(`/sources/site-crawl/url/${appId}`, { data: { url } })
-}
-
-export function sourcesSiteDeleteUrlV2(appId: string, urls: string[]) {
-  return httpClientDappros.delete(`/sources/site-crawl-v2/url/${appId}`, { data: { urls } })
-}
-
+// sources (v1-style routes, user auth). The site-crawl ones are gone: the
+// backend dropped POST /sources/site-crawl/:appId, POST
+// /sources/site-crawl-reindex/:appId and both DELETE url routes. Use the
+// site-crawl-v2 helpers below, which hit /v2/sources/* and
+// /v2/apps/:appId/sources/*.
 export function sourcesDocsUpload(appId: string, formData: any, headers?: any) {
   return httpClientDappros.post(`/sources/docs/${appId}`, formData, { headers })
 }
