@@ -412,6 +412,9 @@ export function agentsCreateV2(payload: {
   prompt?: string
   greetingMessage?: string
   trigger?: "any_message" | "/bot"
+  responseMode?: "always" | "mentioned" | "smart" | "probability"
+  responseProbability?: number
+  cooldownSec?: number
   botDisplayName?: string
   botAvatarUrl?: string
   isRAG?: boolean
@@ -433,6 +436,9 @@ export function agentsUpdateV2(agentId: string, payload: {
   prompt?: string
   greetingMessage?: string
   trigger?: "any_message" | "/bot"
+  responseMode?: "always" | "mentioned" | "smart" | "probability"
+  responseProbability?: number
+  cooldownSec?: number
   botDisplayName?: string
   botAvatarUrl?: string
   isRAG?: boolean
@@ -457,6 +463,127 @@ export function agentsCloneV2(agentId: string, payload?: {
 
 export function agentsActivateV2(agentId: string) {
   return httpClientDappros.post(`/v2/agents/${String(agentId || "").trim()}/activate`, {})
+}
+
+// Phase 1 (Agents): additional wrappers backing the new MCP tools.
+export function agentsSetVisibilityV2(idOrAddress: string, visibility: "private" | "unlisted" | "public") {
+  return httpClientDappros.post(`/v2/agents/${String(idOrAddress || "").trim()}/visibility`, { visibility })
+}
+
+export function agentsSoulV2(idOrAddress: string, payload: { soulMd?: string; append?: string }) {
+  return httpClientDappros.post(`/v2/agents/${String(idOrAddress || "").trim()}/soul`, payload || {})
+}
+
+export function agentsInviteToChatV2(idOrAddress: string, payload: { appId?: string; chatId?: string; chatJid?: string }) {
+  // Use the per-app variant when appId is provided so tenantActor (B2B) auth lands on the right route.
+  if (payload?.appId) {
+    return httpClientDappros.post(
+      `/v2/apps/${String(payload.appId).trim()}/agents/${String(idOrAddress || "").trim()}/invite-to-chat`,
+      payload || {}
+    )
+  }
+  return httpClientDappros.post(`/v2/agents/${String(idOrAddress || "").trim()}/invite-to-chat`, payload || {})
+}
+
+export function botInstancesListV2(params?: { appId?: string; agentId?: string }) {
+  return httpClientDappros.get(`/v2/bot-instances`, { params })
+}
+
+export function botInstanceGetV2(id: string) {
+  return httpClientDappros.get(`/v2/bot-instances/${String(id || "").trim()}`)
+}
+
+export function botInstanceStatusV2(id: string, status: "on" | "off") {
+  return httpClientDappros.post(`/v2/bot-instances/${String(id || "").trim()}/status`, { status })
+}
+
+// --- Agents: full-lifecycle completions (2607 API parity) ---
+
+export function agentsDeleteV2(idOrAddress: string) {
+  return httpClientDappros.delete(`/v2/agents/${String(idOrAddress || "").trim()}`)
+}
+
+export function agentsExportV2(idOrAddress: string, format: "json" | "zip" = "json") {
+  return httpClientDappros.get(`/v2/agents/${String(idOrAddress || "").trim()}/export`, { params: { format } })
+}
+
+export function agentsImportV2(bundle: any, ownerAppId?: string) {
+  // application/json: the request body IS the bundle (output of GET .../export?format=json).
+  const config = ownerAppId ? { params: { ownerAppId } } : undefined
+  return httpClientDappros.post(`/v2/agents/import`, bundle || {}, config)
+}
+
+export function agentBotInstanceDiagV2(idOrAddress: string, botInstanceId: string) {
+  return httpClientDappros.get(
+    `/v2/agents/${String(idOrAddress || "").trim()}/bot-instances/${String(botInstanceId || "").trim()}/diag`
+  )
+}
+
+export function agentBotInstanceTestMessageV2(
+  idOrAddress: string,
+  botInstanceId: string,
+  payload: { text?: string; roomJid?: string }
+) {
+  return httpClientDappros.post(
+    `/v2/agents/${String(idOrAddress || "").trim()}/bot-instances/${String(botInstanceId || "").trim()}/test-message`,
+    payload || {}
+  )
+}
+
+export function agentBotInstanceLeaveChatV2(idOrAddress: string, botInstanceId: string, payload: { chatJid: string }) {
+  return httpClientDappros.post(
+    `/v2/agents/${String(idOrAddress || "").trim()}/bot-instances/${String(botInstanceId || "").trim()}/leave-chat`,
+    payload || {}
+  )
+}
+
+// --- App-scoped chat reads + App bundles (2607 API parity) ---
+
+export function appMessagesSearchV2(
+  appId: string,
+  params: {
+    q: string
+    mode?: "substring" | "fulltext"
+    chatId?: string
+    fromUserId?: string
+    since?: string
+    until?: string
+    sort?: "relevance" | "date"
+    limit?: number
+    offset?: number
+  }
+) {
+  return httpClientDappros.get(`/v2/apps/${String(appId || "").trim()}/messages/search`, { params })
+}
+
+export function appMessagesContextV2(
+  appId: string,
+  chatId: string,
+  params: { aroundStanzaId?: string; aroundMessageId?: string; radius?: number }
+) {
+  return httpClientDappros.get(
+    `/v2/apps/${String(appId || "").trim()}/chats/${String(chatId || "").trim()}/messages/context`,
+    { params }
+  )
+}
+
+export function appUsersUnreadCountsV2(
+  appId: string,
+  payload: { userIds: string[]; mode?: "count" | "flag"; cap?: number; concurrency?: number }
+) {
+  return httpClientDappros.post(`/v2/apps/${String(appId || "").trim()}/users/unread-counts`, payload || {})
+}
+
+export function appExportV2(appId: string, opts?: { format?: "json" | "zip"; include?: string }) {
+  const params: Record<string, string> = { format: opts?.format || "json" }
+  if (opts?.include) params.include = opts.include
+  return httpClientDappros.get(`/v2/apps/${String(appId || "").trim()}/export`, { params })
+}
+
+export function appImportV2(bundle: any, domainNameOverride?: string) {
+  // application/json: the request body IS the bundle (output of GET .../export?format=json).
+  const config = domainNameOverride ? { params: { domainNameOverride } } : undefined
+  return httpClientDappros.post(`/v2/apps/import`, bundle || {}, config)
 }
 
 export function botWidgetGetV2() {
@@ -484,23 +611,11 @@ export function botHistoryGetV2(params?: {
 export const chatsMessageCreateV2 = botMessageCreateV2
 export const chatsHistoryGetV2 = botHistoryGetV2
 
-// sources (v1-style routes, user auth)
-export function sourcesSiteCrawl(appId: string, url: string, followLink: boolean) {
-  return httpClientDappros.post(`/sources/site-crawl/${appId}`, { url, followLink })
-}
-
-export function sourcesSiteReindex(appId: string, urlId: string) {
-  return httpClientDappros.post(`/sources/site-crawl-reindex/${appId}`, { urlId })
-}
-
-export function sourcesSiteDeleteUrl(appId: string, url: string) {
-  return httpClientDappros.delete(`/sources/site-crawl/url/${appId}`, { data: { url } })
-}
-
-export function sourcesSiteDeleteUrlV2(appId: string, urls: string[]) {
-  return httpClientDappros.delete(`/sources/site-crawl-v2/url/${appId}`, { data: { urls } })
-}
-
+// sources (v1-style routes, user auth). The site-crawl ones are gone: the
+// backend dropped POST /sources/site-crawl/:appId, POST
+// /sources/site-crawl-reindex/:appId and both DELETE url routes. Use the
+// site-crawl-v2 helpers below, which hit /v2/sources/* and
+// /v2/apps/:appId/sources/*.
 export function sourcesDocsUpload(appId: string, formData: any, headers?: any) {
   return httpClientDappros.post(`/sources/docs/${appId}`, formData, { headers })
 }

@@ -8,6 +8,25 @@ import {
     agentsGetV2,
     agentsListV2,
     agentsUpdateV2,
+    // Phase 1 (Agents) additions
+    agentsSetVisibilityV2,
+    agentsSoulV2,
+    agentsInviteToChatV2,
+    botInstancesListV2,
+    botInstanceGetV2,
+    botInstanceStatusV2,
+    // 2607 API parity additions
+    agentsDeleteV2,
+    agentsExportV2,
+    agentsImportV2,
+    agentBotInstanceDiagV2,
+    agentBotInstanceTestMessageV2,
+    agentBotInstanceLeaveChatV2,
+    appMessagesSearchV2,
+    appMessagesContextV2,
+    appUsersUnreadCountsV2,
+    appExportV2,
+    appImportV2,
     appCreate,
     appCreateV2,
     appCreateChat,
@@ -55,18 +74,14 @@ import {
     sourcesDocsUpload,
     sourcesDocsUploadForAppV2,
     sourcesDocsUploadV2,
-    sourcesSiteCrawl,
     sourcesSiteCrawlForAppV2,
     sourcesSiteCrawlV2,
     sourcesSiteDeleteBatchForAppV2,
-    sourcesSiteDeleteUrl,
     sourcesSiteDeleteUrlForAppV2,
-    sourcesSiteDeleteUrlV2,
     sourcesSiteDeleteUrlV2Batch,
     sourcesSiteDeleteUrlV2Single,
     sourcesSiteListForAppV2,
     sourcesSiteListV2,
-    sourcesSiteReindex,
     sourcesSiteReindexForAppV2,
     sourcesSiteReindexV2,
     sourcesSiteTagsUpdateForAppV2,
@@ -1371,103 +1386,6 @@ function filesDeleteV2Tool(server: McpServer) {
     )
 }
 
-function sourcesSiteCrawlTool(server: McpServer) {
-    server.registerTool(
-        "ethora-sources-site-crawl",
-        {
-            description: "Crawl a website URL and ingest its content into an app's RAG sources (legacy user-auth route). Async — pages become queryable once indexing finishes; `followLink: true` follows in-domain links and can ingest many pages.\nAuth: user-auth mode, active session; the user must own the app. Errors: 401 not logged in; 403 not owner; 400 malformed `url`; 404 unknown `appId`. Related: app-token/B2B flows use `ethora-sources-site-crawl-v2`.",
-            annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-            inputSchema: {
-                appId: z.string().optional().describe("24-char hex appId to ingest into. Optional — defaults to the app set via `ethora-app-select`."),
-                url: z.string().min(1).describe("Absolute URL to crawl, e.g. `https://example.com/docs`."),
-                followLink: z.boolean().default(false).describe("If true, also crawl in-domain links reachable from `url`. Can ingest many pages — use with care. Default false (single page)."),
-            },
-        },
-        async function ({ appId, url, followLink }) {
-            try {
-                ensureUserAuthForTool()
-                const effectiveAppId = appId || requireCurrentAppId()
-                const res = await sourcesSiteCrawl(effectiveAppId, url, Boolean(followLink))
-                return asToolResult(ok(res.data, getDefaultMeta("ethora-sources-site-crawl")))
-            } catch (error) {
-                return asToolResult(fail(error, getDefaultMeta("ethora-sources-site-crawl")))
-            }
-        }
-    )
-}
-
-function sourcesSiteReindexTool(server: McpServer) {
-    server.registerTool(
-        "ethora-sources-site-reindex",
-        {
-            description: "Re-crawl and re-embed a previously crawled URL by its `urlId`, refreshing the RAG content for that page (legacy user-auth route). Async — the existing source record is updated in place once indexing finishes.\nAuth: user-auth mode, active session; the user must own the app. Errors: 401 not logged in; 403 not owner; 404 unknown `appId` or `urlId`. Related: get `urlId` from `ethora-sources-site-list-v2`; app-token/B2B uses `ethora-sources-site-reindex-v2`.",
-            annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
-            inputSchema: {
-                appId: z.string().optional().describe("24-char hex appId the URL belongs to. Optional — defaults to the app set via `ethora-app-select`."),
-                urlId: z.string().min(1).describe("Id of a previously crawled URL record. Get it from `ethora-sources-site-list-v2`."),
-            },
-        },
-        async function ({ appId, urlId }) {
-            try {
-                ensureUserAuthForTool()
-                const effectiveAppId = appId || requireCurrentAppId()
-                const res = await sourcesSiteReindex(effectiveAppId, urlId)
-                return asToolResult(ok(res.data, getDefaultMeta("ethora-sources-site-reindex")))
-            } catch (error) {
-                return asToolResult(fail(error, getDefaultMeta("ethora-sources-site-reindex")))
-            }
-        }
-    )
-}
-
-function sourcesSiteDeleteUrlTool(server: McpServer) {
-    server.registerTool(
-        "ethora-sources-site-delete-url",
-        {
-            description: "Remove a single crawled URL from an app's RAG sources, matched by its exact url string (legacy user-auth route). Deletes the source record and its embeddings; not reversible. Matches on the exact stored URL string.\nAuth: user-auth mode, active session; the user must own the app. Errors: 401 not logged in; 403 not owner; 404 `url` not a crawled source. Related: get the stored value from `ethora-sources-site-list-v2`.",
-            annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
-            inputSchema: {
-                appId: z.string().optional().describe("24-char hex appId the URL belongs to. Optional — defaults to the app set via `ethora-app-select`."),
-                url: z.string().min(1).describe("Exact crawled URL string to remove (must match what was stored — get it from `ethora-sources-site-list-v2`)."),
-            },
-        },
-        async function ({ appId, url }) {
-            try {
-                ensureUserAuthForTool()
-                const effectiveAppId = appId || requireCurrentAppId()
-                const res = await sourcesSiteDeleteUrl(effectiveAppId, url)
-                return asToolResult(ok(res.data, getDefaultMeta("ethora-sources-site-delete-url")))
-            } catch (error) {
-                return asToolResult(fail(error, getDefaultMeta("ethora-sources-site-delete-url")))
-            }
-        }
-    )
-}
-
-function sourcesSiteDeleteUrlV2Tool(server: McpServer) {
-    server.registerTool(
-        "ethora-sources-site-delete-records-v1",
-        {
-            description: "Bulk-remove crawled URLs (1–100) from an app's RAG sources in one call, matched by exact url strings (legacy owner/admin user-auth route). Deletes each matching source record and its embeddings; not reversible. URLs not present are skipped.\nAuth: user-auth mode, active session; the user must own the app. Errors: 401 not logged in; 403 not owner; 404 unknown `appId`. Related: single-URL variant `ethora-sources-site-delete-url`.",
-            annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
-            inputSchema: {
-                appId: z.string().optional().describe("24-char hex appId the URLs belong to. Optional — defaults to the app set via `ethora-app-select`."),
-                urls: z.array(z.string().min(1)).min(1).max(100).describe("Exact crawled URL strings to remove, 1–100 per call. Get the stored values from `ethora-sources-site-list-v2`."),
-            },
-        },
-        async function ({ appId, urls }) {
-            try {
-                ensureUserAuthForTool()
-                const effectiveAppId = appId || requireCurrentAppId()
-                const res = await sourcesSiteDeleteUrlV2(effectiveAppId, urls)
-                return asToolResult(ok(res.data, getDefaultMeta("ethora-sources-site-delete-records-v1")))
-            } catch (error) {
-                return asToolResult(fail(error, getDefaultMeta("ethora-sources-site-delete-records-v1")))
-            }
-        }
-    )
-}
-
 function sourcesDocsUploadTool(server: McpServer) {
     server.registerTool(
         "ethora-sources-docs-upload",
@@ -1859,8 +1777,7 @@ function b2bBotEnableTool(server: McpServer) {
     server.registerTool(
         "ethora-b2b-bot-enable",
         {
-            description: "Turn on the AI bot for an app via B2B auth (sets `botStatus: \"on\"`). The bot only actually responds if a prompt + LLM are configured (see `ethora-bot-update-v2`) and the backend has an AI service set up.\nAuth: B2B mode (`ethora-auth-use-b2b` + a configured `b2bToken`). Errors: 401/403 not in B2B mode; 400 no `appId` and none selected; 404 unknown `appId`. Related: full bot config via `ethora-bot-update-v2`.",
-            annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+            description: "Enable the LEGACY per-app aiBot (B2B auth). NOTE: apps created via the API/B2B no longer auto-provision a legacy aiBot, so this returns 422 BOT_NOT_INITIALIZED on a clean app. The forward path for B2B AI is the Agents API — use `ethora-b2b-app-bootstrap-ai` or `ethora-agents-create-v2` + `ethora-agent-invite-to-chat`. This tool remains valid for apps that already have a legacy aiBot (e.g. admin-panel apps created with a default chat).",
             inputSchema: {
                 appId: z.string().optional().describe("24-char hex appId whose bot to enable. Optional — defaults to the app set via `ethora-app-select`."),
                 botTrigger: z.string().optional().describe("When the bot responds: `/bot` (only messages starting with /bot) or `any_message` (every message). Omit to leave the existing trigger unchanged."),
@@ -1999,24 +1916,26 @@ function agentsCreateV2Tool(server: McpServer) {
     server.registerTool(
         "ethora-agents-create-v2",
         {
-            description: "Create a new reusable saved agent — a named bot definition (prompt + LLM + RAG settings + identity) that can later be activated onto any app (`POST /v2/agents`). Does not activate it — call `ethora-agents-activate-v2` for that. Returns the created agent including its id.\nAuth: app-token mode (after `ethora-app-select` + `ethora-auth-use-app`). Errors: 401/403 wrong auth; 422 validation (e.g. duplicate `slug`, unsupported `llmProvider`/`llmModel`).",
-            annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+            description: "Create a reusable AI agent (POST /v2/agents). Each agent is a persona — name, avatar, system prompt, LLM config, plus response-gate settings (responseMode, cooldownSec) that control when it speaks in a room. For multi-agent scenarios (two or more personas conversing in one chat) create each one separately, then `ethora-agent-invite-to-chat` them into the same room. See the `ethora-agents-quickstart` prompt for the end-to-end recipe.",
             inputSchema: {
-                name: z.string().optional().describe("Human-readable agent name."),
-                slug: z.string().optional().describe("URL-safe unique identifier for the agent within the app. Lower-case alphanumerics and dashes."),
-                summary: z.string().optional().describe("Short description of what the agent does."),
-                prompt: z.string().optional().describe("System prompt defining the agent's persona and behavior."),
-                greetingMessage: z.string().optional().describe("Message the agent posts when a conversation starts."),
-                trigger: z.enum(["any_message", "/bot"]).optional().describe("When the agent responds: `any_message` (every message) or `/bot` (only /bot-prefixed messages)."),
-                botDisplayName: z.string().optional().describe("Display name shown in chat when this agent is the active bot."),
-                botAvatarUrl: z.string().optional().describe("Public URL of the agent's avatar image."),
-                isRAG: z.boolean().optional().describe("If true, the agent retrieves from the app's indexed RAG sources when answering."),
-                ragTags: z.array(z.string().min(1)).optional().describe("Restrict RAG retrieval to sources carrying these tags."),
-                llmProvider: z.string().optional().describe("LLM provider, e.g. `openai` or `openai-compatible`. Must be enabled in your Ethora backend."),
-                llmModel: z.string().optional().describe("LLM model id, e.g. `gpt-4o-mini`. Must be available for the chosen provider."),
-                visibility: z.enum(["private", "public"]).optional().describe("`private` (only this app) or `public` (discoverable in the shared agent catalogue)."),
-                isPublished: z.boolean().optional().describe("If true and visibility is public, the agent is listed in the public catalogue."),
-                categories: z.array(z.string().min(1)).optional().describe("Catalogue categories for a public agent."),
+                name: z.string().optional().describe("Short display name. For multi-agent scenarios, prefer single-word names (e.g. 'Hannibal', 'Varro') — the @-mention matcher uses the exact display name with word-boundary matching."),
+                slug: z.string().optional().describe("URL-safe slug (auto-generated from name if omitted)."),
+                summary: z.string().optional().describe("Short bio shown in agent lists."),
+                prompt: z.string().optional().describe("System prompt — the agent's persona, role, style of speech, and behaviour rules. For multi-agent scenarios, instruct the agent to end every message with an @-mention of who speaks next; that's how turn-handoff works through the response gate."),
+                greetingMessage: z.string().optional().describe("Optional message the agent posts when it first joins a room."),
+                trigger: z.enum(["any_message", "/bot"]).optional().describe("Legacy trigger field. Prefer the newer `responseMode` for new agents."),
+                responseMode: z.enum(["always", "mentioned", "smart", "probability"]).optional().describe("When the agent decides to reply. 'always' = every room message; 'mentioned' = only when @-mentioned by display name or via /bot (recommended for multi-agent turn-taking); 'smart' = a mini LLM gate decides per-message; 'probability' = coin-flip per message using `responseProbability`."),
+                responseProbability: z.number().min(0).max(1).optional().describe("If responseMode='probability', odds (0-1) of replying to each message. Damped 0.6x for bot-to-bot messages."),
+                cooldownSec: z.number().int().min(0).optional().describe("Minimum seconds between this agent's replies in a given room. Damped 2x for bot-to-bot. Set 0 for quick turn-taking in multi-agent scenarios."),
+                botDisplayName: z.string().optional().describe("Display name used inside the chat UI. Defaults to `name`."),
+                botAvatarUrl: z.string().optional().describe("URL of the avatar image shown next to bot messages."),
+                isRAG: z.boolean().optional().describe("Enable retrieval-augmented generation from indexed sources."),
+                ragTags: z.array(z.string().min(1)).optional().describe("Optional RAG tag filter — restrict retrieval to sources matching these tags."),
+                llmProvider: z.string().optional().describe("LLM provider override (e.g. 'openai'). Defaults to the app's configured provider."),
+                llmModel: z.string().optional().describe("LLM model override (e.g. 'gpt-4o-mini')."),
+                visibility: z.enum(["private", "public"]).optional().describe("'private' (only invitable inside the owning app) or 'public' (cross-app invitable)."),
+                isPublished: z.boolean().optional().describe("Convenience alias for setting visibility='public'."),
+                categories: z.array(z.string().min(1)).optional().describe("Free-form category tags for agent directory listings."),
             },
         },
         async function (payload) {
@@ -2038,25 +1957,27 @@ function agentsUpdateV2Tool(server: McpServer) {
     server.registerTool(
         "ethora-agents-update-v2",
         {
-            description: "Update fields on an existing reusable saved agent (`PUT /v2/agents/:agentId`). Partial update — omitted fields are left unchanged. If the agent is currently activated on the app, changes take effect on the live bot.\nAuth: app-token mode (after `ethora-app-select` + `ethora-auth-use-app`). Errors: 401/403 wrong auth; 404 `agentId` not an agent of the current app; 422 validation. Related: get `agentId` from `ethora-agents-list-v2`.",
-            annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+            description: "Update a saved AI agent (PUT /v2/agents/:agentId). All fields are optional — only what you pass is updated. Common uses: tune the system `prompt` after a test run, switch `responseMode` to control turn-taking in multi-agent rooms, or adjust `cooldownSec`. See `ethora-agents-quickstart` prompt for the end-to-end recipe.",
             inputSchema: {
-                agentId: z.string().min(1).describe("Id of the saved agent to update. Get it from `ethora-agents-list-v2`."),
-                name: z.string().optional().describe("Human-readable agent name."),
-                slug: z.string().optional().describe("URL-safe unique identifier within the app. Lower-case alphanumerics and dashes."),
-                summary: z.string().optional().describe("Short description of what the agent does."),
-                prompt: z.string().optional().describe("System prompt defining the agent's persona and behavior."),
-                greetingMessage: z.string().optional().describe("Message the agent posts when a conversation starts."),
-                trigger: z.enum(["any_message", "/bot"]).optional().describe("When the agent responds: `any_message` (every message) or `/bot` (only /bot-prefixed messages)."),
-                botDisplayName: z.string().optional().describe("Display name shown in chat when this agent is the active bot."),
-                botAvatarUrl: z.string().optional().describe("Public URL of the agent's avatar image."),
-                isRAG: z.boolean().optional().describe("If true, the agent retrieves from the app's indexed RAG sources when answering."),
-                ragTags: z.array(z.string().min(1)).optional().describe("Restrict RAG retrieval to sources carrying these tags."),
-                llmProvider: z.string().optional().describe("LLM provider, e.g. `openai` or `openai-compatible`. Must be enabled in your Ethora backend."),
-                llmModel: z.string().optional().describe("LLM model id, e.g. `gpt-4o-mini`. Must be available for the chosen provider."),
-                visibility: z.enum(["private", "public"]).optional().describe("`private` (only this app) or `public` (discoverable in the shared agent catalogue)."),
-                isPublished: z.boolean().optional().describe("If true and visibility is public, the agent is listed in the public catalogue."),
-                categories: z.array(z.string().min(1)).optional().describe("Catalogue categories for a public agent."),
+                agentId: z.string().min(1).describe("Mongo _id (24 hex chars) of the agent to update."),
+                name: z.string().optional().describe("New display name. For multi-agent scenarios prefer single-word names — the @-mention matcher uses exact display-name match with word-boundary."),
+                slug: z.string().optional().describe("URL-safe slug."),
+                summary: z.string().optional().describe("Short bio."),
+                prompt: z.string().optional().describe("Updated system prompt (persona + behaviour). For multi-agent rooms instruct the agent to end every message with an @-mention of the next speaker — that's how turn-handoff works through the response gate."),
+                greetingMessage: z.string().optional().describe("Message the agent posts when it first joins a new room."),
+                trigger: z.enum(["any_message", "/bot"]).optional().describe("Legacy trigger field. Prefer `responseMode`."),
+                responseMode: z.enum(["always", "mentioned", "smart", "probability"]).optional().describe("When the agent replies. 'always' = every message; 'mentioned' = only @-mention or /bot (best for multi-agent turn-taking); 'smart' = mini-LLM decides; 'probability' = coin-flip using `responseProbability`."),
+                responseProbability: z.number().min(0).max(1).optional().describe("If responseMode='probability', odds (0-1) of replying. Damped 0.6x for bot-to-bot."),
+                cooldownSec: z.number().int().min(0).optional().describe("Minimum seconds between this agent's replies in a given room. Damped 2x for bot-to-bot. Set 0 for quick turn-taking."),
+                botDisplayName: z.string().optional().describe("Display name in chat UI."),
+                botAvatarUrl: z.string().optional().describe("Avatar image URL."),
+                isRAG: z.boolean().optional().describe("Enable RAG retrieval."),
+                ragTags: z.array(z.string().min(1)).optional().describe("RAG tag filter."),
+                llmProvider: z.string().optional().describe("LLM provider override."),
+                llmModel: z.string().optional().describe("LLM model override."),
+                visibility: z.enum(["private", "public"]).optional().describe("'private' or 'public' (cross-app invitable)."),
+                isPublished: z.boolean().optional().describe("Convenience alias for visibility='public'."),
+                categories: z.array(z.string().min(1)).optional().describe("Category tags for directory listings."),
             },
         },
         async function ({ agentId, ...payload }) {
@@ -2125,12 +2046,445 @@ function agentsActivateV2Tool(server: McpServer) {
     )
 }
 
+// ----------------------------------------------------------------------------
+// Phase 1 (Agents) — additional tools.
+// ----------------------------------------------------------------------------
+
+function agentSetVisibilityTool(server: McpServer) {
+    server.registerTool(
+        "ethora-agent-set-visibility",
+        {
+            description: "Set an Agent's visibility (private | unlisted | public). Public agents can be invited cross-app by anyone who knows the address.",
+            inputSchema: {
+                agentIdOrAddress: z.string().min(1),
+                visibility: z.enum(["private", "unlisted", "public"]),
+            },
+        },
+        async function ({ agentIdOrAddress, visibility }) {
+            const meta = getDefaultMeta("ethora-agent-set-visibility")
+            try {
+                ensureAppAuthForTool()
+                const res = await agentsSetVisibilityV2(agentIdOrAddress, visibility)
+                return asToolResult(ok(res.data, meta))
+            } catch (error) {
+                return asToolResult(fail(error, meta))
+            }
+        }
+    )
+}
+
+function agentInviteToChatTool(server: McpServer) {
+    server.registerTool(
+        "ethora-agent-invite-to-chat",
+        {
+            description: "Invite an Agent into a chat room. Multiple agents can coexist in the same room — call this tool once per agent and they will all appear as members able to converse. Lazily creates a per-App BotInstance (an Ethora user with isBot:true) if one does not already exist for (agent, app). Spawns the XMPP client live; no ai-service restart required. For the full multi-agent recipe see the `ethora-agents-quickstart` prompt.",
+            inputSchema: {
+                agentIdOrAddress: z.string().min(1).describe("Either Mongo _id (24 hex chars) or EOA-style address."),
+                appId: z.string().optional().describe("Required in B2B mode unless already selected via ethora-app-select."),
+                chatId: z.string().optional().describe("Mongo Chat _id (preferred when invoking from admin)."),
+                chatJid: z.string().optional().describe("Fully-qualified room JID (preferred when invoking from MCP server / chat-command flow)."),
+            },
+        },
+        async function ({ agentIdOrAddress, appId, chatId, chatJid }) {
+            const meta = getDefaultMeta("ethora-agent-invite-to-chat")
+            try {
+                ensureAppAuthForTool()
+                const ctx = resolveAppScopedV2Context(appId)
+                const payload: any = { chatId, chatJid }
+                if (ctx.mode === "b2b" && ctx.appId) payload.appId = ctx.appId
+                const res = await agentsInviteToChatV2(agentIdOrAddress, payload)
+                return asToolResult(ok(res.data, meta))
+            } catch (error) {
+                return asToolResult(fail(error, meta))
+            }
+        }
+    )
+}
+
+function agentSoulAppendTool(server: McpServer) {
+    server.registerTool(
+        "ethora-agent-soul-append",
+        {
+            description: "Append a fragment to an Agent's SOUL.MD (its evolving identity / private notes). Operator-driven; the Agent itself can also self-edit via the same endpoint when called by ai-service.",
+            inputSchema: {
+                agentIdOrAddress: z.string().min(1),
+                append: z.string().min(1),
+            },
+        },
+        async function ({ agentIdOrAddress, append }) {
+            const meta = getDefaultMeta("ethora-agent-soul-append")
+            try {
+                ensureAppAuthForTool()
+                const res = await agentsSoulV2(agentIdOrAddress, { append })
+                return asToolResult(ok(res.data, meta))
+            } catch (error) {
+                return asToolResult(fail(error, meta))
+            }
+        }
+    )
+}
+
+function agentSoulSetTool(server: McpServer) {
+    server.registerTool(
+        "ethora-agent-soul-set",
+        {
+            description: "Replace an Agent's SOUL.MD with the provided markdown. Operator-driven; alternative to -append.",
+            inputSchema: {
+                agentIdOrAddress: z.string().min(1),
+                soulMd: z.string().min(0).describe("Replace SOUL.MD contents. Pass empty string to clear."),
+            },
+        },
+        async function ({ agentIdOrAddress, soulMd }) {
+            const meta = getDefaultMeta("ethora-agent-soul-set")
+            try {
+                ensureAppAuthForTool()
+                const res = await agentsSoulV2(agentIdOrAddress, { soulMd })
+                return asToolResult(ok(res.data, meta))
+            } catch (error) {
+                return asToolResult(fail(error, meta))
+            }
+        }
+    )
+}
+
+function botInstancesListTool(server: McpServer) {
+    server.registerTool(
+        "ethora-bot-instances-list",
+        {
+            description: "List BotInstances. Filter by appId (caller's App by default) and/or agentId.",
+            inputSchema: {
+                appId: z.string().optional(),
+                agentId: z.string().optional(),
+            },
+        },
+        async function ({ appId, agentId }) {
+            const meta = getDefaultMeta("ethora-bot-instances-list")
+            try {
+                ensureAppAuthForTool()
+                const res = await botInstancesListV2({ appId, agentId })
+                return asToolResult(ok(res.data, meta))
+            } catch (error) {
+                return asToolResult(fail(error, meta))
+            }
+        }
+    )
+}
+
+function botInstanceStatusTool(server: McpServer) {
+    server.registerTool(
+        "ethora-bot-instance-status",
+        {
+            description: "Turn a specific BotInstance on or off. Off detaches it from XMPP; on re-spawns the XMPP client live.",
+            inputSchema: {
+                botInstanceId: z.string().min(1),
+                status: z.enum(["on", "off"]),
+            },
+        },
+        async function ({ botInstanceId, status }) {
+            const meta = getDefaultMeta("ethora-bot-instance-status")
+            try {
+                ensureAppAuthForTool()
+                const res = await botInstanceStatusV2(botInstanceId, status)
+                return asToolResult(ok(res.data, meta))
+            } catch (error) {
+                return asToolResult(fail(error, meta))
+            }
+        }
+    )
+}
+
+// ----------------------------------------------------------------------------
+// 2607 API parity — Agents full lifecycle + app-scoped chat reads + bundles.
+// ----------------------------------------------------------------------------
+
+function agentsDeleteV2Tool(server: McpServer) {
+    server.registerTool(
+        "ethora-agents-delete-v2",
+        {
+            description: "Delete an Agent (DELETE /v2/agents/:idOrAddress). Destructive — removes the saved Agent and its BotInstances. Gated behind ETHORA_ENABLE_DANGEROUS_TOOLS.",
+            inputSchema: {
+                agentIdOrAddress: z.string().min(1).describe("Mongo _id (24 hex chars) or EOA-style address."),
+            },
+        },
+        async function ({ agentIdOrAddress }) {
+            const meta = getDefaultMeta("ethora-agents-delete-v2")
+            try {
+                ensureAppAuthForTool()
+                const res = await agentsDeleteV2(agentIdOrAddress)
+                return asToolResult(ok(res.data, meta))
+            } catch (error) {
+                return asToolResult(fail(error, meta))
+            }
+        }
+    )
+}
+
+function agentsExportV2Tool(server: McpServer) {
+    server.registerTool(
+        "ethora-agents-export-v2",
+        {
+            description: "Export an Agent as a portable bundle (GET /v2/agents/:idOrAddress/export). format=json returns the bundle object directly; feed it back to `ethora-agents-import-v2` to recreate the Agent in another App/tenant.",
+            inputSchema: {
+                agentIdOrAddress: z.string().min(1),
+                format: z.enum(["json", "zip"]).optional().describe("Defaults to json. Prefer json for MCP round-trips."),
+            },
+        },
+        async function ({ agentIdOrAddress, format }) {
+            const meta = getDefaultMeta("ethora-agents-export-v2")
+            try {
+                ensureAppAuthForTool()
+                const res = await agentsExportV2(agentIdOrAddress, format || "json")
+                return asToolResult(ok(res.data, meta))
+            } catch (error) {
+                return asToolResult(fail(error, meta))
+            }
+        }
+    )
+}
+
+function agentsImportV2Tool(server: McpServer) {
+    server.registerTool(
+        "ethora-agents-import-v2",
+        {
+            description: "Import an Agent from a bundle produced by `ethora-agents-export-v2` (POST /v2/agents/import, application/json body IS the bundle). Optionally scope the new Agent to an owning App via ownerAppId.",
+            inputSchema: {
+                bundle: z.any().describe("The exported bundle object (the json export output)."),
+                ownerAppId: z.string().optional().describe("Owning App for the imported Agent (defaults server-side)."),
+            },
+        },
+        async function ({ bundle, ownerAppId }) {
+            const meta = getDefaultMeta("ethora-agents-import-v2")
+            try {
+                ensureAppAuthForTool()
+                const res = await agentsImportV2(bundle, ownerAppId)
+                return asToolResult(ok(res.data, meta))
+            } catch (error) {
+                return asToolResult(fail(error, meta))
+            }
+        }
+    )
+}
+
+function agentBotInstanceDiagTool(server: McpServer) {
+    server.registerTool(
+        "ethora-bot-instance-diag",
+        {
+            description: "Diagnose a specific BotInstance for an Agent (GET /v2/agents/:idOrAddress/bot-instances/:botInstanceId/diag). Returns live XMPP/ai-service status and recent activity for troubleshooting.",
+            inputSchema: {
+                agentIdOrAddress: z.string().min(1),
+                botInstanceId: z.string().min(1),
+            },
+        },
+        async function ({ agentIdOrAddress, botInstanceId }) {
+            const meta = getDefaultMeta("ethora-bot-instance-diag")
+            try {
+                ensureAppAuthForTool()
+                const res = await agentBotInstanceDiagV2(agentIdOrAddress, botInstanceId)
+                return asToolResult(ok(res.data, meta))
+            } catch (error) {
+                return asToolResult(fail(error, meta))
+            }
+        }
+    )
+}
+
+function agentBotInstanceTestMessageTool(server: McpServer) {
+    server.registerTool(
+        "ethora-bot-instance-test-message",
+        {
+            description: "Send a test message from a BotInstance (POST /v2/agents/:idOrAddress/bot-instances/:botInstanceId/test-message). Omit roomJid to fan out to every room the BotInstance is in. Requires the ai-service to be running.",
+            inputSchema: {
+                agentIdOrAddress: z.string().min(1),
+                botInstanceId: z.string().min(1),
+                text: z.string().max(2000).optional().describe("Message body. Optional/empty is allowed."),
+                roomJid: z.string().optional().describe("Target a specific room JID; omit to broadcast to all the bot's rooms."),
+            },
+        },
+        async function ({ agentIdOrAddress, botInstanceId, text, roomJid }) {
+            const meta = getDefaultMeta("ethora-bot-instance-test-message")
+            try {
+                ensureAppAuthForTool()
+                const res = await agentBotInstanceTestMessageV2(agentIdOrAddress, botInstanceId, { text, roomJid })
+                return asToolResult(ok(res.data, meta))
+            } catch (error) {
+                return asToolResult(fail(error, meta))
+            }
+        }
+    )
+}
+
+function agentBotInstanceLeaveChatTool(server: McpServer) {
+    server.registerTool(
+        "ethora-bot-instance-leave-chat",
+        {
+            description: "Remove a BotInstance from a chat room (POST /v2/agents/:idOrAddress/bot-instances/:botInstanceId/leave-chat). The inverse of `ethora-agent-invite-to-chat`.",
+            inputSchema: {
+                agentIdOrAddress: z.string().min(1),
+                botInstanceId: z.string().min(1),
+                chatJid: z.string().min(1).describe("Fully-qualified room JID to leave."),
+            },
+        },
+        async function ({ agentIdOrAddress, botInstanceId, chatJid }) {
+            const meta = getDefaultMeta("ethora-bot-instance-leave-chat")
+            try {
+                ensureAppAuthForTool()
+                const res = await agentBotInstanceLeaveChatV2(agentIdOrAddress, botInstanceId, { chatJid })
+                return asToolResult(ok(res.data, meta))
+            } catch (error) {
+                return asToolResult(fail(error, meta))
+            }
+        }
+    )
+}
+
+function messagesSearchV2Tool(server: McpServer) {
+    server.registerTool(
+        "ethora-messages-search-v2",
+        {
+            description: "Search an App's chat messages (GET /v2/apps/:appId/messages/search). B2B / tenant-actor auth. Filter by room (chatId), author (fromUserId), and time window.",
+            inputSchema: {
+                q: z.string().min(1).max(500).describe("Search query."),
+                appId: z.string().optional().describe("Required in B2B mode unless already selected via ethora-app-select."),
+                mode: z.enum(["substring", "fulltext"]).optional(),
+                chatId: z.string().optional(),
+                fromUserId: z.string().optional(),
+                since: z.string().optional().describe("ISO date lower bound."),
+                until: z.string().optional().describe("ISO date upper bound."),
+                sort: z.enum(["relevance", "date"]).optional(),
+                limit: z.number().int().min(1).max(100).optional(),
+                offset: z.number().int().min(0).optional(),
+            },
+        },
+        async function ({ q, appId, mode, chatId, fromUserId, since, until, sort, limit, offset }) {
+            const meta = getDefaultMeta("ethora-messages-search-v2")
+            try {
+                const ctx = resolveAppScopedV2Context(appId)
+                if (!ctx.appId) throw new Error("appId is required (pass appId or call `ethora-app-select` first).")
+                const res = await appMessagesSearchV2(ctx.appId, { q, mode, chatId, fromUserId, since, until, sort, limit, offset })
+                return asToolResult(ok(res.data, meta))
+            } catch (error) {
+                return asToolResult(fail(error, meta))
+            }
+        }
+    )
+}
+
+function messagesContextV2Tool(server: McpServer) {
+    server.registerTool(
+        "ethora-messages-context-v2",
+        {
+            description: "Fetch the messages surrounding a target message (GET /v2/apps/:appId/chats/:chatId/messages/context). Provide either aroundStanzaId or aroundMessageId; radius controls how many messages before/after.",
+            inputSchema: {
+                chatId: z.string().min(1),
+                appId: z.string().optional().describe("Required in B2B mode unless already selected via ethora-app-select."),
+                aroundStanzaId: z.string().optional(),
+                aroundMessageId: z.string().optional(),
+                radius: z.number().int().min(0).max(50).optional(),
+            },
+        },
+        async function ({ chatId, appId, aroundStanzaId, aroundMessageId, radius }) {
+            const meta = getDefaultMeta("ethora-messages-context-v2")
+            try {
+                if (!aroundStanzaId && !aroundMessageId) {
+                    throw new Error("Provide either aroundStanzaId or aroundMessageId.")
+                }
+                const ctx = resolveAppScopedV2Context(appId)
+                if (!ctx.appId) throw new Error("appId is required (pass appId or call `ethora-app-select` first).")
+                const res = await appMessagesContextV2(ctx.appId, chatId, { aroundStanzaId, aroundMessageId, radius })
+                return asToolResult(ok(res.data, meta))
+            } catch (error) {
+                return asToolResult(fail(error, meta))
+            }
+        }
+    )
+}
+
+function unreadCountsV2Tool(server: McpServer) {
+    server.registerTool(
+        "ethora-unread-counts-v2",
+        {
+            description: "Batch per-room unread message counts for a set of users (POST /v2/apps/:appId/users/unread-counts). mode=count returns numbers (capped); mode=flag returns booleans. Requires Mongo message archiving enabled on the deployment.",
+            inputSchema: {
+                userIds: z.array(z.string().min(1)).min(1).max(200).describe("uuid / Mongo _id / xmppUsername, 1..200."),
+                appId: z.string().optional().describe("Required in B2B mode unless already selected via ethora-app-select."),
+                mode: z.enum(["count", "flag"]).optional(),
+                cap: z.number().int().min(1).max(1000).optional(),
+                concurrency: z.number().int().min(1).max(32).optional(),
+            },
+        },
+        async function ({ userIds, appId, mode, cap, concurrency }) {
+            const meta = getDefaultMeta("ethora-unread-counts-v2")
+            try {
+                const ctx = resolveAppScopedV2Context(appId)
+                if (!ctx.appId) throw new Error("appId is required (pass appId or call `ethora-app-select` first).")
+                const res = await appUsersUnreadCountsV2(ctx.appId, { userIds, mode, cap, concurrency })
+                return asToolResult(ok(res.data, meta))
+            } catch (error) {
+                return asToolResult(fail(error, meta))
+            }
+        }
+    )
+}
+
+function appExportV2Tool(server: McpServer) {
+    server.registerTool(
+        "ethora-app-export-v2",
+        {
+            description: "Export an App as a portable bundle (GET /v2/apps/:appId/export). format=json returns the bundle object directly. Use `include` to select sections (e.g. 'chats,users,sources,botInstances'). Feed the result to `ethora-app-import-v2`.",
+            inputSchema: {
+                appId: z.string().optional().describe("Required in B2B mode unless already selected via ethora-app-select."),
+                format: z.enum(["json", "zip"]).optional(),
+                include: z.string().optional().describe("Comma-separated sections to include, e.g. 'chats,users,sources,botInstances'."),
+            },
+        },
+        async function ({ appId, format, include }) {
+            const meta = getDefaultMeta("ethora-app-export-v2")
+            try {
+                const ctx = resolveAppScopedV2Context(appId)
+                if (!ctx.appId) throw new Error("appId is required (pass appId or call `ethora-app-select` first).")
+                const res = await appExportV2(ctx.appId, { format: format || "json", include })
+                return asToolResult(ok(res.data, meta))
+            } catch (error) {
+                return asToolResult(fail(error, meta))
+            }
+        }
+    )
+}
+
+function appImportV2Tool(server: McpServer) {
+    server.registerTool(
+        "ethora-app-import-v2",
+        {
+            description: "Import an App from a bundle produced by `ethora-app-export-v2` (POST /v2/apps/import, application/json body IS the bundle). B2B / tenant-actor auth. domainNameOverride renames the imported App's domain.",
+            inputSchema: {
+                bundle: z.any().describe("The exported bundle object (the json export output)."),
+                domainNameOverride: z.string().optional().describe("Rename the imported App's domainName."),
+            },
+        },
+        async function ({ bundle, domainNameOverride }) {
+            const meta = getDefaultMeta("ethora-app-import-v2")
+            try {
+                // App import is tenant-actor auth and takes no appId in the path,
+                // so accept either app-token or B2B auth without demanding a
+                // current appId.
+                const state = getClientState() as any
+                if (state.authMode !== "app" && state.authMode !== "b2b") {
+                    throw new Error("This tool requires app-token or B2B auth. Use `ethora-auth-use-app` or `ethora-auth-use-b2b` first.")
+                }
+                const res = await appImportV2(bundle, domainNameOverride)
+                return asToolResult(ok(res.data, meta))
+            } catch (error) {
+                return asToolResult(fail(error, meta))
+            }
+        }
+    )
+}
+
 function botEnableV2Tool(server: McpServer) {
     server.registerTool(
         "ethora-bot-enable-v2",
         {
-            description: "Turn the AI bot on for an app (sets bot `status: \"on\"`), optionally setting its trigger. It only actually responds if a prompt + LLM are configured (see `ethora-bot-update-v2`) and the backend has an AI service.\nAuth: app-token mode OR B2B mode with an explicit `appId`. Errors: 401/403 wrong auth; 404 unknown `appId`. Related: `ethora-bot-disable-v2` to turn off.",
-            annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+            description: "Enable the LEGACY per-app aiBot using app-token or B2B auth. NOTE: clean API/B2B-created apps have no legacy aiBot, so this returns 422 BOT_NOT_INITIALIZED there — use the Agents API (`ethora-agents-create-v2` + `ethora-agent-invite-to-chat`, or `ethora-b2b-app-bootstrap-ai`) for B2B AI. Valid for apps that already have a legacy aiBot.",
             inputSchema: {
                 appId: z.string().optional().describe("24-char hex appId. Required in B2B mode unless already set via `ethora-app-select`; ignored in app-token mode."),
                 trigger: z.enum(["any_message", "/bot"]).optional().describe("When the bot responds: `any_message` (every message) or `/bot` (only /bot-prefixed messages). Omit to leave the existing trigger unchanged."),
@@ -2311,8 +2665,15 @@ async function runB2BAppBootstrapAi(args: {
     llmProvider?: string
     llmModel?: string
     savedAgentId?: string
+    // Phase 1 (Agents) extensions: optionally create a brand-new Agent inside the new
+    // App and invite it into the App's first default room as part of the bootstrap.
+    agentDisplayName?: string
+    agentPrompt?: string
+    agentVisibility?: "private" | "unlisted" | "public"
+    inviteToDefaultRoom?: boolean
 }) {
-    const { displayName, setAsCurrent, crawlUrl, followLink, docs, enableBot, botTrigger, llmProvider, llmModel, savedAgentId } = args
+    const { displayName, setAsCurrent, crawlUrl, followLink, docs, enableBot, botTrigger, llmProvider, llmModel, savedAgentId,
+        agentDisplayName, agentPrompt, agentVisibility, inviteToDefaultRoom } = args
 
     ensureB2BAuthForTool()
 
@@ -2340,6 +2701,35 @@ async function runB2BAppBootstrapAi(args: {
         // at least set current appId, even without token
         selectApp({ appId, authMode: "b2b" })
         steps.push({ step: "appSelect", ok: true, authMode: "b2b" })
+    }
+
+    // 2.5) Ensure the app has a room to host the AI agent / back the widget.
+    // API/B2B-created apps no longer seed a default "Main chat" room (that
+    // default was inverted off for API/B2B callers). Reuse an existing room when
+    // the app already has one — this keeps repeat bootstrap calls (same app,
+    // second agent) landing both agents in the SAME room — otherwise provision
+    // one. Best-effort: recorded as a skip on failure.
+    let bootstrapRoomChatId: string | null = null
+    let bootstrapRoomJid: string | null = null
+    try {
+        let firstRoom: any = null
+        try {
+            const existing = await appGetDefaultRoomsWithAppId(appId)
+            firstRoom = existing?.data?.result?.[0] || existing?.data?.[0] || null
+        } catch { /* no existing rooms readable — fall through to provision */ }
+        if (firstRoom) {
+            bootstrapRoomChatId = String(firstRoom?._id || firstRoom?.chatId || "").trim() || null
+            bootstrapRoomJid = String(firstRoom?.jid || "").trim() || null
+            steps.push({ step: "provisionRoom", ok: true, reused: true, chatId: bootstrapRoomChatId, jid: bootstrapRoomJid })
+        } else {
+            const prov = await appProvisionV2(appId, { rooms: [{ title: `${displayName} Main`, pinned: false }] }, { timeoutMs: 60_000 })
+            const room = Array.isArray(prov?.data?.details) ? prov.data.details[0]?.room : undefined
+            bootstrapRoomChatId = String(room?._id || room?.chatId || "").trim() || null
+            bootstrapRoomJid = String(room?.jid || "").trim() || null
+            steps.push({ step: "provisionRoom", ok: true, reused: false, chatId: bootstrapRoomChatId, jid: bootstrapRoomJid })
+        }
+    } catch (e: any) {
+        steps.push({ step: "provisionRoom", ok: false, error: e?.message || String(e) })
     }
 
     // 3) Index website (app-token sources v2)
@@ -2385,9 +2775,83 @@ async function runB2BAppBootstrapAi(args: {
         if (llmProvider) payload.llmProvider = llmProvider
         if (llmModel) payload.llmModel = llmModel
         if (Object.keys(payload).length > 0) {
-            const r = await botUpdateV2(payload)
-            botEnableResult = r.data
-            steps.push({ step: "botSetup", ok: true })
+            try {
+                const r = await botUpdateV2(payload)
+                botEnableResult = r.data
+                steps.push({ step: "botSetup", ok: true })
+            } catch (e: any) {
+                // On current backends a clean B2B app has no legacy aiBot to
+                // update (PUT /v2/bot => 422 BOT_NOT_INITIALIZED). The forward
+                // path is the Agents API (created + invited below), so treat the
+                // legacy call as a skip rather than failing the whole bootstrap.
+                const status = e?.response?.status
+                const code = e?.response?.data?.code
+                if (status === 422 || code === "BOT_NOT_INITIALIZED") {
+                    steps.push({
+                        step: "botSetup",
+                        ok: false,
+                        skipped: true,
+                        reason: "legacy_bot_not_initialized",
+                        message: "Legacy aiBot is not provisioned for B2B apps; using the Agents API instead.",
+                    })
+                } else {
+                    throw e
+                }
+            }
+        }
+    }
+
+    // 6) Phase 1 (Agents): create a fresh Agent and (optionally) invite it into the App's
+    //    default room. This is the path the AI-assisted Phase 1 demo uses when bootstrapping
+    //    an App with an Agent that has its own persona + RAG, separate from the legacy aiBot.
+    let agentResult: any = null
+    let inviteResult: any = null
+    // Create an Agent when one is explicitly requested, OR when the caller asked
+    // to enable a bot but did not point at a saved agent — on current backends
+    // the Agents API is the only working AI path for a clean B2B app, so
+    // "enableBot: true" is fulfilled by creating + inviting a fresh Agent.
+    const wantAgent = Boolean(agentDisplayName || agentPrompt || (enableBot && !savedAgentId))
+    if (wantAgent) {
+        if (!appToken) throw new Error("Agent creation requested but no appToken available")
+        setAuthMode("app")
+        try {
+            const created = await agentsCreateV2({
+                name: agentDisplayName || `${displayName} Bot`,
+                prompt: agentPrompt || "You are a helpful assistant.",
+                visibility: agentVisibility === "unlisted" ? "private" : (agentVisibility || "private") as any,
+                trigger: (botTrigger as any) || undefined,
+                llmProvider: llmProvider || undefined,
+                llmModel: llmModel || undefined,
+            } as any)
+            agentResult = created.data?.agent
+            steps.push({ step: "agentsCreateV2", ok: true, agentId: agentResult?.id })
+
+            // unlisted -> set after create (createSchema accepts only private|public via legacy alias path).
+            if (agentVisibility === "unlisted" && agentResult?.id) {
+                await agentsSetVisibilityV2(agentResult.id, "unlisted")
+                steps.push({ step: "agentsSetVisibilityV2", ok: true, visibility: "unlisted" })
+            }
+
+            if (inviteToDefaultRoom !== false && agentResult?.id) {
+                // Prefer the room we provisioned above. Fall back to the legacy
+                // default-room lookup for older backends that still seed one.
+                let chatId: string | undefined = bootstrapRoomChatId || undefined
+                let chatJid: string | undefined = bootstrapRoomJid || undefined
+                if (!chatId && !chatJid) {
+                    const rooms = await appGetDefaultRoomsWithAppId(appId)
+                    const firstRoom = rooms?.data?.result?.[0] || rooms?.data?.[0]
+                    chatId = firstRoom?._id || firstRoom?.chatId
+                }
+                if (chatId || chatJid) {
+                    const r = await agentsInviteToChatV2(agentResult.id, { appId, chatId, chatJid })
+                    inviteResult = r.data
+                    steps.push({ step: "agentInviteToChat", ok: true, chatId, chatJid })
+                } else {
+                    steps.push({ step: "agentInviteToChat", ok: false, message: "no room available to invite into" })
+                }
+            }
+        } catch (e: any) {
+            steps.push({ step: "agentBootstrap", ok: false, error: e?.message || String(e) })
         }
     }
 
@@ -2395,7 +2859,7 @@ async function runB2BAppBootstrapAi(args: {
     if (shouldSetCurrent && appToken) setAuthMode("app")
     else setAuthMode("b2b")
 
-    return { appId, appToken: appToken || undefined, app, crawl: crawlResult, docs: docsResult, bot: botEnableResult, steps, state: getClientState() }
+    return { appId, appToken: appToken || undefined, app, crawl: crawlResult, docs: docsResult, bot: botEnableResult, agent: agentResult, invite: inviteResult, steps, state: getClientState() }
 }
 
 // Minimal namespace aliases to reduce auth-mode mistakes for agents.
@@ -2519,22 +2983,29 @@ function b2bAppBootstrapAiTool(server: McpServer) {
                 crawlUrl: z.string().optional().describe("Optional website URL to crawl and index into the new app's RAG sources."),
                 followLink: z.boolean().optional().describe("For `crawlUrl`: also follow in-domain links (default true). Can ingest many pages."),
                 docs: z.array(z.object({
-                    name: z.string().min(1).describe("Document file name including extension."),
-                    mimeType: z.string().min(1).describe("MIME type, e.g. `application/pdf`."),
-                    base64: z.string().min(1).describe("Document content, base64-encoded."),
-                })).optional().describe("Optional documents to ingest into the new app's RAG sources."),
-                savedAgentId: z.string().optional().describe("Optional id of an existing saved agent to bind as the new app's active bot, instead of configuring prompt/LLM by hand."),
-                enableBot: z.boolean().optional().describe("If true, set the new app's bot to `status: on` (best-effort AI service activation)."),
-                botTrigger: z.string().optional().describe("Bot trigger: `/bot` (only /bot-prefixed messages) or `any_message` (every message)."),
-                llmProvider: z.string().optional().describe("LLM provider for the bot, e.g. `openai` or `openai-compatible`. Must be enabled in your Ethora backend."),
-                llmModel: z.string().optional().describe("LLM model id for the bot, e.g. `gpt-4o-mini`. Must be available for the chosen provider."),
+                    name: z.string().min(1),
+                    mimeType: z.string().min(1),
+                    base64: z.string().min(1),
+                })).optional().describe("Optional docs to ingest (base64)"),
+                savedAgentId: z.string().optional().describe("Optional saved agent to bind as the active bot for the new app."),
+                enableBot: z.boolean().optional().describe("If true, enables botStatus=on (best-effort AI service activation)"),
+                botTrigger: z.string().optional().describe("Optional bot trigger (e.g. '/bot' or 'any_message')"),
+                llmProvider: z.string().optional().describe("Optional generation provider for the default AI bot (example: 'openai' or 'openai-compatible')."),
+                llmModel: z.string().optional().describe("Optional generation model for the default AI bot (example: 'gpt-4o-mini')."),
+                // Phase 1 (Agents) extensions
+                agentDisplayName: z.string().optional().describe("Phase 1: create a new Agent with this display name as part of bootstrap."),
+                agentPrompt: z.string().optional().describe("Phase 1: persona/instructions for the newly-created Agent."),
+                agentVisibility: z.enum(["private", "unlisted", "public"]).optional().describe("Phase 1: visibility for the newly-created Agent."),
+                inviteToDefaultRoom: z.boolean().optional().describe("Phase 1: if true (default), invite the newly-created Agent into the App's first default room."),
             },
         },
-        async function ({ displayName, setAsCurrent, crawlUrl, followLink, docs, enableBot, botTrigger, llmProvider, llmModel, savedAgentId }) {
+        async function ({ displayName, setAsCurrent, crawlUrl, followLink, docs, enableBot, botTrigger, llmProvider, llmModel, savedAgentId,
+            agentDisplayName, agentPrompt, agentVisibility, inviteToDefaultRoom }) {
             const meta = getDefaultMeta("ethora-b2b-app-bootstrap-ai")
             const prev = (getClientState() as any).authMode as any
             try {
-                const res = await runB2BAppBootstrapAi({ displayName, setAsCurrent, crawlUrl, followLink, docs, enableBot, botTrigger, llmProvider, llmModel, savedAgentId })
+                const res = await runB2BAppBootstrapAi({ displayName, setAsCurrent, crawlUrl, followLink, docs, enableBot, botTrigger, llmProvider, llmModel, savedAgentId,
+                    agentDisplayName, agentPrompt, agentVisibility, inviteToDefaultRoom })
                 return asToolResult(ok(res, meta))
             } catch (error) {
                 // restore previous mode best-effort
@@ -3338,10 +3809,6 @@ export function registerTools(server: McpServer) {
     filesUploadV2Tool(server);
     filesGetV2Tool(server);
     filesDeleteV2Tool(server);
-    sourcesSiteCrawlTool(server);
-    sourcesSiteReindexTool(server);
-    sourcesSiteDeleteUrlTool(server);
-    sourcesSiteDeleteUrlV2Tool(server);
     sourcesDocsUploadTool(server);
     sourcesDocsDeleteTool(server);
     sourcesSiteCrawlV2AppTool(server);
@@ -3379,6 +3846,8 @@ export function registerTools(server: McpServer) {
         walletERC20TransferTool(server);
         // Bulk deletes
         sourcesSiteDeleteUrlV2BatchAppTool(server);
+        // Agent delete (removes saved Agent + its BotInstances)
+        agentsDeleteV2Tool(server);
     }
     b2bAppCreateTool(server);
     b2bBotEnableTool(server);
@@ -3393,6 +3862,24 @@ export function registerTools(server: McpServer) {
     agentsUpdateV2Tool(server);
     agentsCloneV2Tool(server);
     agentsActivateV2Tool(server);
+    // Phase 1 (Agents) additions: visibility, soul.md, invite-to-chat, BotInstance lifecycle.
+    agentSetVisibilityTool(server);
+    agentInviteToChatTool(server);
+    agentSoulAppendTool(server);
+    agentSoulSetTool(server);
+    botInstancesListTool(server);
+    botInstanceStatusTool(server);
+    // 2607 API parity: agents full lifecycle + app-scoped chat reads + bundles.
+    agentsExportV2Tool(server);
+    agentsImportV2Tool(server);
+    agentBotInstanceDiagTool(server);
+    agentBotInstanceTestMessageTool(server);
+    agentBotInstanceLeaveChatTool(server);
+    messagesSearchV2Tool(server);
+    messagesContextV2Tool(server);
+    unreadCountsV2Tool(server);
+    appExportV2Tool(server);
+    appImportV2Tool(server);
     chatsMessageCreateV2Tool(server);
     chatsHistoryGetV2Tool(server);
     if (isAliasesEnabled()) {
