@@ -142,10 +142,6 @@ Tip: to list runnable recipes without calling `ethora-help`, call `ethora-run-re
   - `ethora-files-delete-v2` — delete file by id (requires user auth)
 
 - **Sources**
-  - `ethora-sources-site-crawl` — crawl a URL (requires user auth)
-  - `ethora-sources-site-reindex` — reindex URL by urlId (requires user auth)
-  - `ethora-sources-site-delete-url` — delete by URL (requires user auth)
-  - `ethora-sources-site-delete-url-v2` — batch delete URLs (requires user auth)
   - `ethora-sources-docs-upload` — upload docs for ingestion (requires user auth)
   - `ethora-sources-docs-delete` — delete ingested doc by id (requires user auth)
   - `ethora-sources-site-crawl-v2` — crawl a URL using app-token auth or B2B + explicit `appId`
